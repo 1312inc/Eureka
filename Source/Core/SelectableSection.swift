@@ -143,6 +143,50 @@ open class SelectableSection<Row>: Section, SelectableSectionType where Row: Sel
         super.init()
     }
 
+    /**
+     Returns the selected row of this section. Should be used if selectionType is SingleSelection
+     */
+    public func selectedRow() -> SelectableRow? {
+        return selectedRows().first as? SelectableRow
+    }
+    
+    /**
+     Returns the selected rows of this section. Should be used if selectionType is MultipleSelection
+     */
+    public func selectedRows() -> [SelectableRow] {
+        let selectedRows: [BaseRow] = self.allRows.filter({ (row: BaseRow) -> Bool in
+            row is SelectableRow && row.baseValue != nil
+        })
+        return selectedRows.map { $0 as! SelectableRow }
+    }
+    
+    /**
+     Internal function used to set up a collection of rows before they are added to the section
+     */
+    func prepareSelectableRows(_ rows: [BaseRow]){
+        for row in rows {
+            if let row = row as? SelectableRow {
+                row.onCellSelection { [weak self] cell, row in
+                    guard let s = self else { return }
+                    switch s.selectionType {
+                    case .multipleSelection:
+                        row.value = row.value == nil ? row.selectableValue : nil
+                        row.updateCell()
+                    case .singleSelection(let enableDeselection):
+                        s.filter { $0.baseValue != nil && $0 != row }.forEach {
+                            $0.baseValue = nil
+                            $0.updateCell()
+                        }
+                        row.value = !enableDeselection || row.value == nil ? row.selectableValue : nil
+                        row.updateCell()
+                    }
+                    s.onSelectSelectableRow?(cell, row)
+                }
+            }
+        }
+    }
+
+    
     #if swift(>=4.1)
     public required init<S>(_ elements: S) where S : Sequence, S.Element == BaseRow {
         super.init(elements)
